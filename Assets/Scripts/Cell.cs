@@ -1,13 +1,5 @@
 using UnityEngine;
 
-public enum WallOrientation
-{
-    WEST = 0,
-    NORTH = 1,
-    EAST = 2,
-    SOUTH = 3
-}
-
 public class Cell : MonoBehaviour
 {
     // Orden: 0 = WEST, 1 = NORTH, 2 = EAST, 3 = SOUTH

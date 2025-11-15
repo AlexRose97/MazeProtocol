@@ -1,23 +1,14 @@
 using System.Collections;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
 public class Maze : MonoBehaviour
 {
-    private enum MazeState
-    {
-        None,
-        Generating,
-        Preview,
-        Playing
-    }
-
     [Header("View")]
-    public Transform cameraTransform;        // Cámara top-down
-    public GameObject characterPrefab;       // Prefab del jugador (con su cámara)
-    public TextMeshProUGUI countdownText;    // Texto del contador
-    public float previewDuration = 5f;       // Segundos de vista desde arriba
+    public Transform cameraTransform;         // Cámara top-down
+    public GameObject characterPrefab;        // Prefab del jugador (con su cámara)
+    public TextMeshProUGUI countdownText;     // Texto para mensajes y contador
+    public float previewDuration = 5f;        // Segundos de vista desde arriba
 
     [Header("Prefabs")]
     public GameObject cellPrefab;
@@ -27,53 +18,30 @@ public class Maze : MonoBehaviour
     public int height = 10;
 
     [Header("Cell")]
-    public float cellSize = 4f;              // Cada celda mide cellSize x cellSize
+    public float cellSize = 4f;               // Cada celda mide cellSize x cellSize
+    public float spawnStepDelay = 0.02f;      // Tiempo entre instancias de celdas
 
-    private Cell[,] _cellGrid;
-    private Stack<Cell> _stack;
-    private MazeState _state = MazeState.None;
+    [Header("Random")]
+    public int randomSeed = 0;                // Si es 0, se usa un seed aleatorio
 
-    private struct NeighborInfo
+    private Cell[,] cellGrid;
+
+    private IEnumerator Start()
     {
-        public Cell cell;
-        public WallOrientation fromCurrent;
-        public WallOrientation fromNeighbor;
-
-        public NeighborInfo(Cell cell, WallOrientation fromCurrent, WallOrientation fromNeighbor)
-        {
-            this.cell = cell;
-            this.fromCurrent = fromCurrent;
-            this.fromNeighbor = fromNeighbor;
-        }
-    }
-
-    private void Start()
-    {
-        _cellGrid = new Cell[width, height];
-        _stack = new Stack<Cell>();
+        cellGrid = new Cell[width, height];
 
         SetupCameraTopDown();
-        HideCountdown();
+        ShowMessage("Generando...");
 
-        StartCoroutine(InstantiateCells());
-    }
+        int? seedToUse = randomSeed == 0 ? (int?)null : randomSeed;
+        var generator = new MazeGenerator(width, height, seedToUse);
+        generator.Generate(); // Lógica pura, rápida, sin visual
 
-    private void Update()
-    {
-        switch (_state)
-        {
-            case MazeState.Generating:
-                StepGeneration();
-                break;
+        yield return StartCoroutine(SpawnCellsFromData(generator));
 
-            case MazeState.Preview:
-                // La lógica de preview está en la corrutina PreviewAndSpawn
-                break;
+        OpenEntranceAndExit();
 
-            case MazeState.Playing:
-                // Aquí podrías manejar lógica adicional cuando el jugador ya está activo
-                break;
-        }
+        yield return PreviewAndSpawn();
     }
 
     private void SetupCameraTopDown()
@@ -92,137 +60,57 @@ public class Maze : MonoBehaviour
         cameraTransform.rotation = Quaternion.Euler(90f, 0f, 0f);
     }
 
-    private void HideCountdown()
+    private void ShowMessage(string message)
     {
-        if (countdownText)
+        if (countdownText == null) return;
+
+        countdownText.gameObject.SetActive(true);
+        countdownText.text = message;
+    }
+
+    private void HideText()
+    {
+        if (countdownText != null)
         {
             countdownText.gameObject.SetActive(false);
         }
     }
 
-    private IEnumerator InstantiateCells()
+    private IEnumerator SpawnCellsFromData(MazeGenerator generator)
     {
-        for (int x = 0; x < width; x++)
+        for (int x = 0; x < generator.Width; x++)
         {
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < generator.Height; y++)
             {
                 Vector3 pos = new Vector3(x * cellSize, 0f, y * cellSize);
                 GameObject cellGO = Instantiate(cellPrefab, pos, Quaternion.identity, transform);
 
                 Cell cell = cellGO.GetComponent<Cell>();
-                _cellGrid[x, y] = cell;
+                cellGrid[x, y] = cell;
+
+                MazeCellData data = generator.Cells[x, y];
+
+                // Abrir paredes según los datos generados
+                for (int i = 0; i < 4; i++)
+                {
+                    if (!data.Walls[i])
+                    {
+                        cell.HideWall((WallOrientation)i);
+                    }
+                }
+
+                if (spawnStepDelay > 0f)
+                    yield return new WaitForSeconds(spawnStepDelay);
+                else
+                    yield return null;
             }
         }
-
-        // Celda inicial en la esquina (0,0)
-        Cell start = _cellGrid[0, 0];
-        start.isVisited = true;
-        _stack.Push(start);
-
-        _state = MazeState.Generating;
-        yield return null;
-    }
-
-    private void StepGeneration()
-    {
-        if (_stack.Count == 0)
-        {
-            OpenEntranceAndExit();
-            _state = MazeState.Preview;
-            StartCoroutine(PreviewAndSpawn());
-            return;
-        }
-
-        Cell current = _stack.Peek();
-        List<NeighborInfo> neighbors = GetUnvisitedNeighbors(current);
-
-        if (neighbors.Count > 0)
-        {
-            NeighborInfo chosen = neighbors[Random.Range(0, neighbors.Count)];
-
-            current.HideWall(chosen.fromCurrent);
-            chosen.cell.HideWall(chosen.fromNeighbor);
-
-            chosen.cell.isVisited = true;
-            _stack.Push(chosen.cell);
-        }
-        else
-        {
-            _stack.Pop();
-        }
-    }
-
-    private List<NeighborInfo> GetUnvisitedNeighbors(Cell current)
-    {
-        var result = new List<NeighborInfo>();
-
-        Vector3 pos = current.transform.position;
-        int x = Mathf.RoundToInt(pos.x / cellSize);
-        int y = Mathf.RoundToInt(pos.z / cellSize);
-
-        // Oeste
-        if (x > 0)
-        {
-            Cell next = _cellGrid[x - 1, y];
-            if (!next.isVisited)
-            {
-                result.Add(new NeighborInfo(
-                    next,
-                    WallOrientation.WEST,
-                    WallOrientation.EAST
-                ));
-            }
-        }
-
-        // Norte
-        if (y < height - 1)
-        {
-            Cell next = _cellGrid[x, y + 1];
-            if (!next.isVisited)
-            {
-                result.Add(new NeighborInfo(
-                    next,
-                    WallOrientation.NORTH,
-                    WallOrientation.SOUTH
-                ));
-            }
-        }
-
-        // Este
-        if (x < width - 1)
-        {
-            Cell next = _cellGrid[x + 1, y];
-            if (!next.isVisited)
-            {
-                result.Add(new NeighborInfo(
-                    next,
-                    WallOrientation.EAST,
-                    WallOrientation.WEST
-                ));
-            }
-        }
-
-        // Sur
-        if (y > 0)
-        {
-            Cell next = _cellGrid[x, y - 1];
-            if (!next.isVisited)
-            {
-                result.Add(new NeighborInfo(
-                    next,
-                    WallOrientation.SOUTH,
-                    WallOrientation.NORTH
-                ));
-            }
-        }
-
-        return result;
     }
 
     private void OpenEntranceAndExit()
     {
-        Cell start = _cellGrid[0, 0];
-        Cell end = _cellGrid[width - 1, height - 1];
+        Cell start = cellGrid[0, 0];
+        Cell end = cellGrid[width - 1, height - 1];
 
         start.HideWall(WallOrientation.WEST);
         end.HideWall(WallOrientation.EAST);
@@ -230,16 +118,16 @@ public class Maze : MonoBehaviour
 
     private IEnumerator PreviewAndSpawn()
     {
-        if (countdownText)
+        float remaining = previewDuration;
+
+        if (countdownText != null)
         {
             countdownText.gameObject.SetActive(true);
         }
 
-        float remaining = previewDuration;
-
         while (remaining > 0f)
         {
-            if (countdownText)
+            if (countdownText != null)
             {
                 countdownText.text = Mathf.CeilToInt(remaining).ToString();
             }
@@ -248,15 +136,13 @@ public class Maze : MonoBehaviour
             remaining -= 1f;
         }
 
-        HideCountdown();
+        HideText();
         SpawnPlayer();
-
-        _state = MazeState.Playing;
     }
 
     private void SpawnPlayer()
     {
-        if (cameraTransform)
+        if (cameraTransform != null)
         {
             Destroy(cameraTransform.gameObject);
         }
@@ -265,7 +151,7 @@ public class Maze : MonoBehaviour
         float z = 0 * cellSize;
         Vector3 position = new Vector3(x, 1.5f, z);
 
-        if (characterPrefab)
+        if (characterPrefab != null)
         {
             Instantiate(characterPrefab, position, Quaternion.identity);
         }
@@ -273,14 +159,15 @@ public class Maze : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        if (_stack == null) return;
+        if (cellGrid == null) return;
 
         Gizmos.color = Color.red;
-        foreach (var cell in _stack)
+
+        foreach (var cell in cellGrid)
         {
             if (cell != null)
             {
-                Gizmos.DrawSphere(cell.transform.position, 0.25f);
+                Gizmos.DrawSphere(cell.transform.position, 0.1f);
             }
         }
     }
