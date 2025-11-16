@@ -2,20 +2,24 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Combat;
-using Enemies;
 using TMPro;
-using Unity.AI.Navigation;
 using UnityEngine;
+using Unity.AI.Navigation;
+using Enemies;
+using GameScripts;
 
 namespace MazeScripts
 {
     public class Maze : MonoBehaviour
     {
         [Header("View")]
-        public Transform cameraTransform;         // Cámara top-down inicial
-        public GameObject characterPrefab;        // Prefab del jugador (con su cámara)
-        public TextMeshProUGUI countdownText;     // Texto para mensajes y contador
+        public Transform cameraTransform;
+        public GameObject characterPrefab;
+        public TextMeshProUGUI countdownText;   // texto de mensajes (preview, win/lose)
         public float previewDuration = 5f;
+
+        [Header("Timer")]
+        public TextMeshProUGUI timerText;       // texto de tiempo restante
 
         [Header("Prefabs")]
         public GameObject cellPrefab;
@@ -29,7 +33,7 @@ namespace MazeScripts
         public float spawnStepDelay = 0.02f;
 
         [Header("Random")]
-        public int randomSeed = 0;                // Si es 0, se genera una semilla al vuelo
+        public int randomSeed = 0;
 
         [Header("Navigation")]
         public NavMeshSurface navMeshSurface;
@@ -37,19 +41,52 @@ namespace MazeScripts
         [Header("Enemies")]
         public GameObject enemyPrefab;
         [Range(0f, 1f)]
-        public float enemyDensity = 0.25f;        // 0.25 = 1 enemigo cada 4 celdas
+        public float enemyDensity = 0.25f;
+
         [Header("Goal")]
         public GameObject goalPrefab;
-        
+
         private Cell[,] _cellGrid;
         private int _effectiveSeed;
         private System.Random _rng;
+
         private bool _gameEnded;
+        private bool _gameRunning;
+        private float _timeRemaining;
 
         private void Awake()
         {
             _effectiveSeed = randomSeed != 0 ? randomSeed : Environment.TickCount;
             _rng = new System.Random(_effectiveSeed);
+
+            ApplyDifficulty();
+        }
+
+        private void ApplyDifficulty()
+        {
+            switch (GameDifficulty.Current)
+            {
+                case DifficultyLevel.Easy:
+                    width = 5;
+                    height = 5;
+                    enemyDensity = 0.10f;
+                    _timeRemaining = 60f;
+                    break;
+                case DifficultyLevel.Medium:
+                    width = 10;
+                    height = 10;
+                    enemyDensity = 0.15f;
+                    _timeRemaining = 45f;
+                    break;
+                case DifficultyLevel.Hard:
+                    width = 15;
+                    height = 15;
+                    enemyDensity = 0.25f;
+                    _timeRemaining = 30f;
+                    break;
+            }
+
+            UpdateTimerUI();
         }
 
         private IEnumerator Start()
@@ -57,7 +94,7 @@ namespace MazeScripts
             _cellGrid = new Cell[width, height];
 
             SetupCameraTopDown();
-            SetTextVisible(true, "Generando...");
+            SetMessageVisible(true, "Generando...");
 
             var generator = new MazeGenerator(width, height, _effectiveSeed);
             generator.Generate();
@@ -76,6 +113,24 @@ namespace MazeScripts
             yield return PreviewAndSpawn();
         }
 
+        private void Update()
+        {
+            if (_gameEnded || !_gameRunning) return;
+
+            _timeRemaining -= Time.deltaTime;
+
+            if (_timeRemaining <= 0f)
+            {
+                _timeRemaining = 0f;
+                UpdateTimerUI();
+                OnTimeOut();
+            }
+            else
+            {
+                UpdateTimerUI();
+            }
+        }
+
         private void SetupCameraTopDown()
         {
             if (cameraTransform == null) return;
@@ -92,7 +147,7 @@ namespace MazeScripts
             cameraTransform.rotation = Quaternion.Euler(90f, 0f, 0f);
         }
 
-        private void SetTextVisible(bool visible, string text = null)
+        private void SetMessageVisible(bool visible, string text = null)
         {
             if (countdownText == null) return;
 
@@ -101,6 +156,14 @@ namespace MazeScripts
             {
                 countdownText.text = text;
             }
+        }
+
+        private void UpdateTimerUI()
+        {
+            if (timerText == null) return;
+
+            int seconds = Mathf.CeilToInt(_timeRemaining);
+            timerText.text = seconds.ToString();
         }
 
         private IEnumerator SpawnCellsFromData(MazeGenerator generator)
@@ -142,10 +205,20 @@ namespace MazeScripts
             end.HideWall(WallOrientation.EAST);
         }
 
+        private void SpawnGoal()
+        {
+            if (goalPrefab == null) return;
+
+            Cell end = _cellGrid[width - 1, height - 1];
+            Vector3 pos = end.transform.position + new Vector3(0f, 0.5f, 0f);
+
+            Instantiate(goalPrefab, pos, Quaternion.identity);
+        }
+
         private IEnumerator PreviewAndSpawn()
         {
             float remaining = previewDuration;
-            SetTextVisible(true);
+            SetMessageVisible(true);
 
             while (remaining > 0f)
             {
@@ -158,7 +231,7 @@ namespace MazeScripts
                 remaining -= 1f;
             }
 
-            SetTextVisible(false);
+            SetMessageVisible(false);
             SpawnPlayer();
         }
 
@@ -179,20 +252,22 @@ namespace MazeScripts
             }
 
             if (player == null) return;
-            
-            // Enemigos persiguen
+
+            var playerTransform = player.transform;
+
             var chasers = FindObjectsOfType<SimpleChaser>();
             foreach (var c in chasers)
             {
-                c.SetTarget(player.transform);
+                c.SetTarget(playerTransform);
             }
-            
-            // Suscribir a la muerte del player
+
             var health = player.GetComponent<Health>();
             if (health != null)
             {
                 health.OnDeath += OnPlayerDied;
             }
+
+            _gameRunning = true;
         }
 
         private void SpawnEnemies()
@@ -234,22 +309,13 @@ namespace MazeScripts
             }
         }
 
-        private void SpawnGoal()
-        {
-            if (goalPrefab == null) return;
-
-            Cell end = _cellGrid[width - 1, height - 1];
-            Vector3 pos = end.transform.position + new Vector3(0f, 0.5f, 0f);
-
-            Instantiate(goalPrefab, pos, Quaternion.identity);
-        }
-
         public void OnGoalReached()
         {
             if (_gameEnded) return;
             _gameEnded = true;
+            _gameRunning = false;
 
-            SetTextVisible(true, "¡Ganaste!");
+            SetMessageVisible(true, "¡Ganaste!");
             Time.timeScale = 0f;
         }
 
@@ -257,10 +323,22 @@ namespace MazeScripts
         {
             if (_gameEnded) return;
             _gameEnded = true;
+            _gameRunning = false;
 
-            SetTextVisible(true, "Game Over");
+            SetMessageVisible(true, "Game Over");
             Time.timeScale = 0f;
         }
+
+        private void OnTimeOut()
+        {
+            if (_gameEnded) return;
+            _gameEnded = true;
+            _gameRunning = false;
+
+            SetMessageVisible(true, "Tiempo agotado");
+            Time.timeScale = 0f;
+        }
+
         private void OnDrawGizmos()
         {
             if (_cellGrid == null) return;
