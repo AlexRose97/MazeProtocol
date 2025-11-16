@@ -1597,7 +1597,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2274d07351dd08843b09b37faee63e9a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gameSceneName: Game
+  gameSceneName: MazeLevel
 --- !u!4 &2032385117
 Transform:
   m_ObjectHideFlags: 0
