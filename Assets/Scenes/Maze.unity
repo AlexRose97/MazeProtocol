@@ -715,6 +715,10 @@ PrefabInstance:
       value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 4578357001299563739, guid: 3ba6f1bb60f04484885ca1b1608998c8, type: 3}
+      propertyPath: enemyDensity
+      value: 0.031
+      objectReference: {fileID: 0}
+    - target: {fileID: 4578357001299563739, guid: 3ba6f1bb60f04484885ca1b1608998c8, type: 3}
       propertyPath: countdownText
       value: 
       objectReference: {fileID: 1926742959}

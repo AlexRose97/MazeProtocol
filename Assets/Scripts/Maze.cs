@@ -1,6 +1,8 @@
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using Unity.AI.Navigation; 
 
 public class Maze : MonoBehaviour
 {
@@ -23,7 +25,16 @@ public class Maze : MonoBehaviour
 
     [Header("Random")]
     public int randomSeed = 0;                // Si es 0, se usa un seed aleatorio
+    
+    [Header("Navigation")]
+    public NavMeshSurface navMeshSurface;
+    
 
+    [Header("Enemies")]
+    public GameObject enemyPrefab;
+    [Range(0f, 1f)]
+    public float enemyDensity = 0.25f; // 0.25 = 1 enemigo cada 4 celdas
+    
     private Cell[,] cellGrid;
 
     private IEnumerator Start()
@@ -38,9 +49,14 @@ public class Maze : MonoBehaviour
         generator.Generate(); // Lógica pura, rápida, sin visual
 
         yield return StartCoroutine(SpawnCellsFromData(generator));
-
+        
+        if (navMeshSurface != null)
+        {
+            navMeshSurface.BuildNavMesh();
+        }
+        
         OpenEntranceAndExit();
-
+        SpawnEnemies();  
         yield return PreviewAndSpawn();
     }
 
@@ -151,9 +167,60 @@ public class Maze : MonoBehaviour
         float z = 0 * cellSize;
         Vector3 position = new Vector3(x, 1.5f, z);
 
+        GameObject player = null;
+
         if (characterPrefab != null)
         {
-            Instantiate(characterPrefab, position, Quaternion.identity);
+            player = Instantiate(characterPrefab, position, Quaternion.identity);
+        }
+
+        if (player != null)
+        {
+            var chasers = FindObjectsOfType<SimpleChaser>();
+            foreach (var c in chasers)
+            {
+                c.SetTarget(player.transform);
+            }
+        }
+    }
+    private void SpawnEnemies()
+    {
+        if (enemyPrefab == null) return;
+
+        int totalCells = width * height;
+        int enemyCount = Mathf.FloorToInt(totalCells * enemyDensity);
+
+        if (enemyCount <= 0) return;
+
+        var usedPositions = new HashSet<Vector2Int>();
+        var rng = new System.Random(randomSeed == 0 ? System.Environment.TickCount : randomSeed);
+
+        // Evitar esquina inicio y esquina final
+        usedPositions.Add(new Vector2Int(0, 0));
+        usedPositions.Add(new Vector2Int(width - 1, height - 1));
+
+        int maxAttempts = totalCells * 3;
+        int spawned = 0;
+        int attempts = 0;
+
+        while (spawned < enemyCount && attempts < maxAttempts)
+        {
+            attempts++;
+
+            int x = rng.Next(0, width);
+            int y = rng.Next(0, height);
+
+            var cellPos = new Vector2Int(x, y);
+            if (usedPositions.Contains(cellPos)) continue;
+
+            Cell cell = cellGrid[x, y];
+            if (cell == null) continue;
+
+            Vector3 pos = cell.transform.position + new Vector3(0f, 1.5f, 0f);
+            Instantiate(enemyPrefab, pos, Quaternion.identity);
+
+            usedPositions.Add(cellPos);
+            spawned++;
         }
     }
 
