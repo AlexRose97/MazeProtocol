@@ -11,9 +11,10 @@ GameObject:
   - component: {fileID: 1973821209064464863}
   - component: {fileID: 7408146821394962320}
   - component: {fileID: 985340267815132211}
+  - component: {fileID: 2161319896593303942}
   m_Layer: 7
   m_Name: Player
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -82,6 +83,20 @@ MonoBehaviour:
   characterController: {fileID: 7408146821394962320}
   mainCamera: {fileID: 8831371590194016972}
   playerInputHandler: {fileID: 3794616831624923287}
+--- !u!114 &2161319896593303942
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 589918490715412143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4fa23c6ee14f1c04bb9e84aa9e4bd260, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 100
+  destroyOnDeath: 0
 --- !u!1 &3056114256711405005
 GameObject:
   m_ObjectHideFlags: 0

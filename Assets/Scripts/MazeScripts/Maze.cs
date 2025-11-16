@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Combat;
 using Enemies;
 using TMPro;
 using Unity.AI.Navigation;
@@ -37,10 +38,13 @@ namespace MazeScripts
         public GameObject enemyPrefab;
         [Range(0f, 1f)]
         public float enemyDensity = 0.25f;        // 0.25 = 1 enemigo cada 4 celdas
-
+        [Header("Goal")]
+        public GameObject goalPrefab;
+        
         private Cell[,] _cellGrid;
         private int _effectiveSeed;
         private System.Random _rng;
+        private bool _gameEnded;
 
         private void Awake()
         {
@@ -66,6 +70,7 @@ namespace MazeScripts
             }
 
             OpenEntranceAndExit();
+            SpawnGoal();
             SpawnEnemies();
 
             yield return PreviewAndSpawn();
@@ -174,11 +179,19 @@ namespace MazeScripts
             }
 
             if (player == null) return;
-
+            
+            // Enemigos persiguen
             var chasers = FindObjectsOfType<SimpleChaser>();
             foreach (var c in chasers)
             {
                 c.SetTarget(player.transform);
+            }
+            
+            // Suscribir a la muerte del player
+            var health = player.GetComponent<Health>();
+            if (health != null)
+            {
+                health.OnDeath += OnPlayerDied;
             }
         }
 
@@ -221,6 +234,33 @@ namespace MazeScripts
             }
         }
 
+        private void SpawnGoal()
+        {
+            if (goalPrefab == null) return;
+
+            Cell end = _cellGrid[width - 1, height - 1];
+            Vector3 pos = end.transform.position + new Vector3(0f, 0.5f, 0f);
+
+            Instantiate(goalPrefab, pos, Quaternion.identity);
+        }
+
+        public void OnGoalReached()
+        {
+            if (_gameEnded) return;
+            _gameEnded = true;
+
+            SetTextVisible(true, "¡Ganaste!");
+            Time.timeScale = 0f;
+        }
+
+        private void OnPlayerDied()
+        {
+            if (_gameEnded) return;
+            _gameEnded = true;
+
+            SetTextVisible(true, "Game Over");
+            Time.timeScale = 0f;
+        }
         private void OnDrawGizmos()
         {
             if (_cellGrid == null) return;
