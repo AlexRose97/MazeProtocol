@@ -57,7 +57,7 @@ MonoBehaviour:
   randomSeed: 0
   navMeshSurface: {fileID: 2123464223740078086}
   enemyPrefab: {fileID: 5450507544191696365, guid: 4108307525baa2f49a1a96d75a0f6614, type: 3}
-  enemyDensity: 0.25
+  enemyDensity: 0.11
 --- !u!114 &2123464223740078086
 MonoBehaviour:
   m_ObjectHideFlags: 0
