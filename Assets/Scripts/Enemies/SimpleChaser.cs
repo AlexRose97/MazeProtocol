@@ -32,7 +32,7 @@ namespace Enemies
 
         private void UpdateDestination()
         {
-            if (target == null || _agent == null) return;
+            if (!target || !_agent) return;
             if (!_agent.isOnNavMesh) return;
 
             _agent.SetDestination(target.position);

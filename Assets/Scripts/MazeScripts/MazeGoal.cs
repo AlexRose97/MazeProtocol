@@ -9,7 +9,7 @@ namespace MazeScripts
         private void Awake()
         {
             // Si no se asigna por inspector, lo buscamos
-            if (maze == null)
+            if (!maze)
             {
                 maze = FindObjectOfType<Maze>();
             }
@@ -19,7 +19,7 @@ namespace MazeScripts
         {
             if (!other.CompareTag("Player")) return;
 
-            if (maze != null)
+            if (maze)
             {
                 maze.OnGoalReached();
             }

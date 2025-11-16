@@ -15,12 +15,15 @@ namespace MazeScripts
         [Header("View")]
         public Transform cameraTransform;
         public GameObject characterPrefab;
-        public TextMeshProUGUI countdownText;   // texto de mensajes (preview, win/lose)
+        public TextMeshProUGUI countdownText;
         public float previewDuration = 5f;
 
         [Header("Timer")]
-        public TextMeshProUGUI timerText;       // texto de tiempo restante
-
+        public TextMeshProUGUI timerText;
+        
+        [Header("Menus")]
+        [SerializeField] private InGameMenuController inGameMenu;
+        
         [Header("Prefabs")]
         public GameObject cellPrefab;
 
@@ -115,6 +118,7 @@ namespace MazeScripts
 
         private void Update()
         {
+            HandlePauseInput();
             if (_gameEnded || !_gameRunning) return;
 
             _timeRemaining -= Time.deltaTime;
@@ -133,7 +137,7 @@ namespace MazeScripts
 
         private void SetupCameraTopDown()
         {
-            if (cameraTransform == null) return;
+            if (!cameraTransform) return;
 
             float centerX = (width - 1) * cellSize / 2f;
             float centerZ = (height - 1) * cellSize / 2f;
@@ -149,7 +153,7 @@ namespace MazeScripts
 
         private void SetMessageVisible(bool visible, string text = null)
         {
-            if (countdownText == null) return;
+            if (!countdownText) return;
 
             countdownText.gameObject.SetActive(visible);
             if (visible && text != null)
@@ -160,7 +164,7 @@ namespace MazeScripts
 
         private void UpdateTimerUI()
         {
-            if (timerText == null) return;
+            if (!timerText) return;
 
             int seconds = Mathf.CeilToInt(_timeRemaining);
             timerText.text = seconds.ToString();
@@ -207,7 +211,7 @@ namespace MazeScripts
 
         private void SpawnGoal()
         {
-            if (goalPrefab == null) return;
+            if (!goalPrefab) return;
 
             Cell end = _cellGrid[width - 1, height - 1];
             Vector3 pos = end.transform.position + new Vector3(0f, 0.5f, 0f);
@@ -222,7 +226,7 @@ namespace MazeScripts
 
             while (remaining > 0f)
             {
-                if (countdownText != null)
+                if (countdownText)
                 {
                     countdownText.text = Mathf.CeilToInt(remaining).ToString();
                 }
@@ -237,7 +241,7 @@ namespace MazeScripts
 
         private void SpawnPlayer()
         {
-            if (cameraTransform != null)
+            if (cameraTransform)
             {
                 Destroy(cameraTransform.gameObject);
             }
@@ -246,12 +250,12 @@ namespace MazeScripts
 
             GameObject player = null;
 
-            if (characterPrefab != null)
+            if (characterPrefab)
             {
                 player = Instantiate(characterPrefab, position, Quaternion.identity);
             }
 
-            if (player == null) return;
+            if (!player) return;
 
             var playerTransform = player.transform;
 
@@ -272,7 +276,7 @@ namespace MazeScripts
 
         private void SpawnEnemies()
         {
-            if (enemyPrefab == null) return;
+            if (!enemyPrefab) return;
 
             int totalCells = width * height;
             int enemyCount = Mathf.FloorToInt(totalCells * enemyDensity);
@@ -315,8 +319,16 @@ namespace MazeScripts
             _gameEnded = true;
             _gameRunning = false;
 
-            SetMessageVisible(true, "¡Ganaste!");
             Time.timeScale = 0f;
+
+            if (inGameMenu != null)
+            {
+                inGameMenu.ShowEndMenu(won: true);
+            }
+            else
+            {
+                Debug.Log("Ganaste");
+            }
         }
 
         private void OnPlayerDied()
@@ -325,8 +337,16 @@ namespace MazeScripts
             _gameEnded = true;
             _gameRunning = false;
 
-            SetMessageVisible(true, "Game Over");
             Time.timeScale = 0f;
+
+            if (inGameMenu != null)
+            {
+                inGameMenu.ShowEndMenu(won: false);
+            }
+            else
+            {
+                Debug.Log("Game Over");
+            }
         }
 
         private void OnTimeOut()
@@ -335,8 +355,45 @@ namespace MazeScripts
             _gameEnded = true;
             _gameRunning = false;
 
-            SetMessageVisible(true, "Tiempo agotado");
             Time.timeScale = 0f;
+
+            if (inGameMenu)
+            {
+                inGameMenu.ShowEndMenu(won: false, timeOut: true);
+            }
+            else
+            {
+                Debug.Log("Tiempo agotado");
+            }
+        }
+        
+        private void HandlePauseInput()
+        {
+            if (Input.GetKeyDown(KeyCode.Tab))
+            {
+                if (!inGameMenu) return;
+
+                // Si ya terminó la partida, solo dejamos que usen el menú para ir al main
+                if (_gameEnded)
+                {
+                    // El menú ya debería estar abierto en este punto
+                    return;
+                }
+
+                if (!inGameMenu.IsOpen)
+                {
+                    // Pausar
+                    _gameRunning = false;
+                    Time.timeScale = 0f;
+                    inGameMenu.ShowPauseMenu();
+                }
+                else
+                {
+                    // Reanudar
+                    inGameMenu.OnResumePressed(); // esto apaga panel y pone timescale=1
+                    _gameRunning = true;
+                }
+            }
         }
 
         private void OnDrawGizmos()
