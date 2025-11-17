@@ -205,7 +205,7 @@ namespace MazeScripts
             Cell start = _cellGrid[0, 0];
             Cell end = _cellGrid[width - 1, height - 1];
 
-            start.HideWall(WallOrientation.WEST);
+            //start.HideWall(WallOrientation.WEST);
             end.HideWall(WallOrientation.EAST);
         }
 
@@ -214,7 +214,7 @@ namespace MazeScripts
             if (!goalPrefab) return;
 
             Cell end = _cellGrid[width - 1, height - 1];
-            Vector3 pos = end.transform.position + new Vector3(0f, 0.5f, 0f);
+            Vector3 pos = end.transform.position + new Vector3(2f, 0.5f, 0f);
 
             Instantiate(goalPrefab, pos, Quaternion.identity);
         }
