@@ -49,6 +49,8 @@ MonoBehaviour:
   characterPrefab: {fileID: 589918490715412143, guid: c008192d10acf6d4b92de184059eddd7, type: 3}
   countdownText: {fileID: 0}
   previewDuration: 5
+  timerText: {fileID: 0}
+  inGameMenu: {fileID: 0}
   cellPrefab: {fileID: 8177582619382870090, guid: 3e1ca9c5e1145c14dad450eac951c4af, type: 3}
   width: 10
   height: 10
@@ -79,7 +81,7 @@ MonoBehaviour:
   m_LayerMask:
     serializedVersion: 2
     m_Bits: 64
-  m_UseGeometry: 0
+  m_UseGeometry: 1
   m_DefaultArea: 0
   m_GenerateLinks: 0
   m_IgnoreNavMeshAgent: 1
